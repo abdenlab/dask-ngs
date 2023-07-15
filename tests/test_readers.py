@@ -11,7 +11,7 @@ def example_bam():
 
 
 def test_read_bam_pnext_value(example_bam):
-    # Verifies that the pnext value was read corretly from the BAM file
+    # Verifies that the pnext value was read correctly from the BAM file
     few_pnext_values = example_bam['pnext'].head()
     assert few_pnext_values[2] == 82982
 
