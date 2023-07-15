@@ -1,12 +1,15 @@
 from __future__ import annotations
+
 from pathlib import Path
-import dask_ngs
+
 import numpy as np
 import pandas as pd
 import pytest
 
+import dask_ngs
 
-@pytest.fixture
+
+@pytest.fixture()
 def example_bam():
     return dask_ngs.read_bam(str(Path(__file__).parent / "fixtures" / "example.bam"))
 
