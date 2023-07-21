@@ -24,14 +24,24 @@ import numpy as np
 import pandas as pd
 
 
-# Reads BAM data from Oxbox using a query:
-# Path, chromosome index, start bytes, end bytes
 def _read_bam_query_from_path(
     path: str, chrom: str, start: int, end: int
 ) -> pd.DataFrame:
+    """Reads BAM data from Oxbox using a query
+    
+    path : string
+        The path to read the file from
+    chromo : string
+        The chromosome to read
+    start : int
+        The start index in bytes
+    end : int
+        The End index in bytes
+    """
     stream = BytesIO(ox.read_bam(path, f"{chrom}:{start}-{end}"))
     ipc = pyarrow.ipc.open_file(stream)
     return ipc.read_pandas()
+
 
 BAI_MIN_SHIFT = 14
 BAI_DEPTH = 5
@@ -39,7 +49,8 @@ COMPRESSED_POSITION_SHIFT = 16
 UNCOMPRESSED_POSITION_MASK = 0xffff
 BLOCKSIZE = 65536
 
-def read_bai(path):
+
+def read_bai(path: str):
     """
     https://samtools.github.io/hts-specs/SAMv1.pdf
     """
@@ -64,12 +75,12 @@ def read_bai(path):
             bin_id = int.from_bytes(f.read(4), **int_kwargs)
 
             if bin_id == 37450:
-                # This is an entry that describes the "pseudo-bin" for the 
-                # reference, using the same byte layout as normal bins but 
+                # This is an entry that describes the "pseudo-bin" for the
+                # reference, using the same byte layout as normal bins but
                 # interpreted differently.
                 # The ref beg/ref end fields locate the first and last reads on
-                # this reference sequence, whether they are mapped or placed 
-                # unmapped. Thus they are equal to the minimum chunk beg and 
+                # this reference sequence, whether they are mapped or placed
+                # unmapped. Thus they are equal to the minimum chunk beg and
                 # maximum chunk end respectively.
                 n_chunk = int.from_bytes(f.read(4), **int_kwargs)  # always 2
                 # Not really a chunk
@@ -93,7 +104,8 @@ def read_bai(path):
                 chunk_end_cpos = vpos >> COMPRESSED_POSITION_SHIFT
                 chunk_end_upos = vpos & UNCOMPRESSED_POSITION_MASK
 
-                chunks.append((bin_id, chunk_beg_cpos, chunk_beg_upos, chunk_end_cpos, chunk_end_upos))   
+                chunks.append(
+                    (bin_id, chunk_beg_cpos, chunk_beg_upos, chunk_end_cpos, chunk_end_upos))
 
             ref["bins"] = chunks
 
@@ -120,23 +132,37 @@ def read_bai(path):
 
             ref["bins"] = pd.DataFrame(
                 ref["bins"],
-                columns=["bin_id", "chunk_beg.cpos", "chunk_beg.upos", "chunk_end.cpos", "chunk_end.upos"]
+                columns=["bin_id", "chunk_beg.cpos", "chunk_beg.upos",
+                         "chunk_end.cpos", "chunk_end.upos"]
             )
             ref["ioffsets"] = pd.DataFrame(
                 ref["ioffsets"],
                 columns=["ioffset.cpos", "ioffset.upos"]
             )
 
-    return references, n_no_coor  
+    return references, n_no_coor
 
-# Loops through a given array of integers, cumulatively summing the values.
-# The rows are labeled with a `chunk_id`, starting at 0.
-# When the cumulative sum exceeds the threshold, the chunk_id is incremented,
-# and the next rows are binned into the next chunk until again the threshold
-# is reached. The cumulative sum of that chunk is also recorded as `size`.
-# Returns a tuple of the cumulative sum array and the chunk_id array.
-def cumsum_label_chunks(arr, thresh: int):
+
+def cumsum_label_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.array] :
+    """
+    Loops through a given array of integers, cumulatively summing the values.
+    The rows are labeled with a `chunk_id`, starting at 0.
+    When the cumulative sum exceeds the threshold, the chunk_id is incremented,
+    and the next rows are binned into the next chunk until again the threshold
+    is reached. The cumulative sum of that chunk is also recorded as `size`.
+    Returns a tuple of the cumulative sum array and the chunk_id array.
+
+    Args:
+        arr : numpy array
+            The array to chunk
+        thresh : int
+            The size of chunks in bytes
     
+    Returns:
+        Tuple of numpy arrays
+        0 : array of cumulative byte sums
+        1 : array of chunk_ids assigned to each row
+    """
     sum = 0
     chunkid = 0
     cumsums = np.zeros_like(arr)
@@ -151,6 +177,62 @@ def cumsum_label_chunks(arr, thresh: int):
     return cumsums, chunk_ids
 
 
+def chunk_offsets(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.DataFrame:
+    """Given a dataframe of offset positions, calculate the difference
+       between each byte offset.
+       Group those differences into chunks of size `chunksize_bytes`.
+
+       Returns:
+           A Pandas dataframe with additional columns:
+           chunk_id : int
+               The chunk index that row was assigned
+           size : int
+               The cumulative size of that chunk
+    """
+
+    # calculate the difference in byte positions from the prior row
+    # i.e. current row - previous
+    offsets["ioffset.cpos.diff"] = offsets['ioffset.cpos'].diff().fillna(
+        0).astype(int)
+
+    # group the offsets so 
+    # this produces a dataframe that looks like this:
+    # ioffset.cpos | ioffset.upos |	ioffset.cpos.diff
+    #        38660 |            0 |	                0
+    #       157643 |	    61968 |            118983
+    #       456717 |	    19251 |            299074
+    # this represents how far to read each compressed array
+    # e.g. 38660 + 118983 = 157643
+    offsets_uniq = offsets.groupby("ioffset.cpos").agg({
+        "ioffset.upos": "first",
+        "ioffset.cpos.diff": "first"
+    }).reset_index()
+    
+    cumsums, chunk_ids = cumsum_label_chunks(
+        offsets_uniq["ioffset.cpos.diff"].to_numpy(), chunksize_bytes)
+    offsets_uniq["chunk_id"] = chunk_ids
+    offsets_uniq["size"] = cumsums
+
+    return offsets_uniq
+
+def group_chunks(offsets_uniq: pd.DataFrame) -> pd.DataFrame:
+    """Group the data by `chunk_id`,
+       keeping the first compressed byte value (`ioffset.cpos`)
+       and the first uncompressed byte value of that stream (`ioffset.upos`).
+       Take the last `size` value which tells you how many compressed bytes to read.
+
+       Returns:
+           A Pandas dataframe grouped by `chunk_id`
+           Now you can decompress the data starting from `ioffset.cpos` and read `size` bytes.
+           `ioffsets.upos` tells you which byte to read first from the uncompressed data.
+    """
+    return offsets_uniq.groupby("chunk_id").agg({
+        "ioffset.cpos": "first",
+        "ioffset.upos": "first",
+        "size": "last"
+    })    
+
+
 if __name__ == '__main__':
 
     os.chdir('./src/dask_ngs')
@@ -159,30 +241,9 @@ if __name__ == '__main__':
     bai, n_no_coor = read_bai('example.bam.bai')
     # select the data that defines the byte range offsets in the file
     offsets = bai[0]["ioffsets"]
-    # calculate the difference in byte positions from the prior row
-    # i.e. current row - previous
-    offsets["ioffset.cpos.diff"] = offsets['ioffset.cpos'].diff().fillna(0).astype(int)
-
-    offsets_uniq = offsets.groupby("ioffset.cpos").agg({
-        "ioffset.upos": "first",
-        "ioffset.cpos.diff": "first"
-    }).reset_index()
-
     # note that the chunksize in this example is 1MB, not 100MB as is recommended for dask
-    cumsums, chunk_ids = cumsum_label_chunks(offsets_uniq["ioffset.cpos.diff"].to_numpy(), 1000000)
-    offsets_uniq["chunk_id"] = chunk_ids
-    offsets_uniq["size"] = cumsums
+    offsets_uniq = chunk_offsets(offsets, 1_000_000)
 
-    # Group the data by chunk_id, 
-    # keeping the first compressed byte value (`ioffset.cpos`)
-    # and the first uncompressed byte value of that stream (`ioffset.upos`).
-    # Take the last size value which tells you how many compressed bytes to read.
-    # Now you can decompress the data starting from `ioffset.cpos` and read `size` bytes.
-    # `ioffsets.upos` tells you which byte to read first from the uncompressed data.
-    offsets_uniq.groupby("chunk_id").agg({
-        "ioffset.cpos": "first",
-        "ioffset.upos": "first",
-        "size": "last"
-    })
+    offset_groups = group_chunks(offsets_uniq)
 
-    offsets_uniq
+    offset_groups
