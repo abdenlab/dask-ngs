@@ -19,7 +19,7 @@ def _read_bam_query_from_path(
 ) -> pd.DataFrame:
     stream = BytesIO(ox.read_bam(path, f"{chrom}:{start}-{end}"))
     ipc = pyarrow.ipc.open_file(stream)
-    return ipc.to_pandas()
+    return ipc.read_pandas()
 
 
 def read_bam(path: str, chunksize: int = 10_000_000) -> dd.DataFrame:
@@ -41,7 +41,7 @@ def read_bam(path: str, chunksize: int = 10_000_000) -> dd.DataFrame:
     chromsizes = bioframe.fetch_chromsizes("hg38")
     chunk_spans = bioframe.binnify(chromsizes, chunksize)
     chunks = [
-        dask.delayed(_read_bam_query_from_path)(path, chrom, start, end)
+        dask.delayed(_read_bam_query_from_path)(path, chrom, start + 1, end)
         for chrom, start, end in chunk_spans.to_numpy()
     ]
     return dd.from_delayed(chunks)
