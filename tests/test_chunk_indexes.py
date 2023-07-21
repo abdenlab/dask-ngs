@@ -1,11 +1,6 @@
 from __future__ import annotations
-
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
 import pytest
-
+from pathlib import Path
 from dask_ngs import _index
 
 
@@ -30,8 +25,8 @@ def test_chunk_offsets(offsets):
         prev = offsets_uniq.iloc[i]
         next = offsets_uniq.iloc[i+1]
         # validate differences
-        assert next['ioffset.cpos'] - \
-            prev['ioffset.cpos'] == next['ioffset.cpos.diff']
+        assert next['ioffset.cpos'] - prev['ioffset.cpos'] \
+                == next['ioffset.cpos.diff']
         cumsum += next['ioffset.cpos.diff']
         if cumsum > chunksize:
             cumsum = 0
@@ -53,5 +48,5 @@ def test_chunk_groups(offsets):
     # matches the start of the chunk (`ioffset.cpos`) + its `size`
     for i in range(len(offset_groups)):
         g = offset_groups.iloc[i]
-        assert g['ioffset.cpos'] + \
-            g['size'] == last_cpos.iloc[i]['ioffset.cpos']
+        assert g['ioffset.cpos'] + g['size'] \
+                == last_cpos.iloc[i]['ioffset.cpos']
