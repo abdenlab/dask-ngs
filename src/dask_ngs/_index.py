@@ -28,7 +28,7 @@ def _read_bam_query_from_path(
     path: str, chrom: str, start: int, end: int
 ) -> pd.DataFrame:
     """Reads BAM data from Oxbox using a query
-    
+
     path : string
         The path to read the file from
     chromo : string
@@ -143,7 +143,7 @@ def read_bai(path: str):
     return references, n_no_coor
 
 
-def cumsum_label_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.array] :
+def cumsum_label_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.array]:
     """
     Loops through a given array of integers, cumulatively summing the values.
     The rows are labeled with a `chunk_id`, starting at 0.
@@ -157,7 +157,7 @@ def cumsum_label_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.array]
             The array to chunk
         thresh : int
             The size of chunks in bytes
-    
+
     Returns:
         Tuple of numpy arrays
         0 : array of cumulative byte sums
@@ -195,7 +195,7 @@ def chunk_offsets(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.DataFrame:
     offsets["ioffset.cpos.diff"] = offsets['ioffset.cpos'].diff().fillna(
         0).astype(int)
 
-    # group the offsets so 
+    # group the offsets so
     # this produces a dataframe that looks like this:
     # ioffset.cpos | ioffset.upos |	ioffset.cpos.diff
     #        38660 |            0 |	                0
@@ -207,13 +207,14 @@ def chunk_offsets(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.DataFrame:
         "ioffset.upos": "first",
         "ioffset.cpos.diff": "first"
     }).reset_index()
-    
+
     cumsums, chunk_ids = cumsum_label_chunks(
         offsets_uniq["ioffset.cpos.diff"].to_numpy(), chunksize_bytes)
     offsets_uniq["chunk_id"] = chunk_ids
     offsets_uniq["size"] = cumsums
 
     return offsets_uniq
+
 
 def group_chunks(offsets_uniq: pd.DataFrame) -> pd.DataFrame:
     """Group the data by `chunk_id`,
@@ -230,7 +231,7 @@ def group_chunks(offsets_uniq: pd.DataFrame) -> pd.DataFrame:
         "ioffset.cpos": "first",
         "ioffset.upos": "first",
         "size": "last"
-    })    
+    })
 
 
 if __name__ == '__main__':
