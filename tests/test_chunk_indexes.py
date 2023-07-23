@@ -39,7 +39,6 @@ def test_map_offsets_to_chunks(offsets, chunksize):
         # validate chunk sizes
         assert next["size"] == cumsum
         assert next["size"] <= chunksize
-    return offsets_uniq
 
 
 @pytest.mark.parametrize(
@@ -48,7 +47,7 @@ def test_map_offsets_to_chunks(offsets, chunksize):
     indirect=["offsets"],
 )
 def test_consolidate_chunks(offsets, chunksize):
-    offsets_uniq = test_map_offsets_to_chunks(offsets, chunksize)
+    offsets_uniq = _index.map_offsets_to_chunks(offsets, chunksize)
     offset_groups = _index.consolidate_chunks(offsets_uniq)
 
     last_cpos = offsets_uniq.groupby("chunk_id").agg(
