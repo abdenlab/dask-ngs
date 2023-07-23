@@ -16,10 +16,10 @@ def offsets(example_bai):
     return bai[0]["ioffsets"]
 
 
-@pytest.mark.parametrize('offsets, chunksize', 
+@pytest.mark.parametrize('offsets, chunksize',
     [('offsets', 500_000), ('offsets', 1_000_000)], indirect=['offsets'])
-def test_chunk_offsets(offsets, chunksize):    
-    offsets_uniq = _index.chunk_offsets(offsets, chunksize)
+def test_map_offsets_to_chunks(offsets, chunksize):
+    offsets_uniq = _index.map_offsets_to_chunks(offsets, chunksize)
 
     cumsum = 0
     for i in range(len(offsets_uniq)-1):
@@ -37,11 +37,11 @@ def test_chunk_offsets(offsets, chunksize):
     return offsets_uniq
 
 
-@pytest.mark.parametrize('offsets, chunksize', 
+@pytest.mark.parametrize('offsets, chunksize',
     [('offsets', 500_000), ('offsets', 1_000_000)], indirect=['offsets'])
-def test_chunk_groups(offsets, chunksize):
-    offsets_uniq = test_chunk_offsets(offsets, chunksize)
-    offset_groups = _index.group_chunks(offsets_uniq)
+def test_consolidate_chunks(offsets, chunksize):
+    offsets_uniq = test_map_offsets_to_chunks(offsets, chunksize)
+    offset_groups = _index.consolidate_chunks(offsets_uniq)
 
     last_cpos = offsets_uniq.groupby('chunk_id').agg({
         "ioffset.cpos": "last",
