@@ -1,6 +1,9 @@
 from __future__ import annotations
-import pytest
+
 from pathlib import Path
+
+import pytest
+
 from dask_ngs import _index
 
 
@@ -16,7 +19,7 @@ def offsets(example_bai):
     return bai[0]["ioffsets"]
 
 
-@pytest.mark.parametrize('offsets, chunksize',
+@pytest.mark.parametrize(("offsets", "chunksize"),
     [('offsets', 500_000), ('offsets', 1_000_000)], indirect=['offsets'])
 def test_map_offsets_to_chunks(offsets, chunksize):
     offsets_uniq = _index.map_offsets_to_chunks(offsets, chunksize)
@@ -37,7 +40,7 @@ def test_map_offsets_to_chunks(offsets, chunksize):
     return offsets_uniq
 
 
-@pytest.mark.parametrize('offsets, chunksize',
+@pytest.mark.parametrize(("offsets", "chunksize"),
     [('offsets', 500_000), ('offsets', 1_000_000)], indirect=['offsets'])
 def test_consolidate_chunks(offsets, chunksize):
     offsets_uniq = test_map_offsets_to_chunks(offsets, chunksize)
