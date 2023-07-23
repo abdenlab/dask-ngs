@@ -1,46 +1,7 @@
-import pathlib
-import io
 import os
-
-import pysam
-import polars as pl
-import pyarrow as pa
-import pandas as pd
-import bioframe
-
-import dask_ngs
-from io import BytesIO
-
-import bioframe
-import dask
-import dask.dataframe as dd
-import oxbow as ox
-import pandas as pd
-import pyarrow.ipc
-from gzip import GzipFile
-from io import BytesIO
 
 import numpy as np
 import pandas as pd
-
-
-def _read_bam_query_from_path(
-    path: str, chrom: str, start: int, end: int
-) -> pd.DataFrame:
-    """Reads BAM data from Oxbox using a query
-
-    path : string
-        The path to read the file from
-    chromo : string
-        The chromosome to read
-    start : int
-        The start index in bytes
-    end : int
-        The End index in bytes
-    """
-    stream = BytesIO(ox.read_bam(path, f"{chrom}:{start}-{end}"))
-    ipc = pyarrow.ipc.open_file(stream)
-    return ipc.read_pandas()
 
 
 BAI_MIN_SHIFT = 14
@@ -143,7 +104,7 @@ def read_bai(path: str):
     return references, n_no_coor
 
 
-def cumsum_label_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.array]:
+def _cumsum_assign_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.array]:
     """
     Loops through a given array of integers, cumulatively summing the values.
     The rows are labeled with a `chunk_id`, starting at 0.
@@ -154,7 +115,7 @@ def cumsum_label_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.array]
 
     Args:
         arr : numpy array
-            The array to chunk
+            The array of byte offsets to chunk
         thresh : int
             The size of chunks in bytes
 
@@ -177,7 +138,7 @@ def cumsum_label_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.array]
     return cumsums, chunk_ids
 
 
-def chunk_offsets(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.DataFrame:
+def map_offsets_to_chunks(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.DataFrame:
     """Given a dataframe of offset positions, calculate the difference
        between each byte offset.
        Group those differences into chunks of size `chunksize_bytes`.
@@ -208,7 +169,7 @@ def chunk_offsets(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.DataFrame:
         "ioffset.cpos.diff": "first"
     }).reset_index()
 
-    cumsums, chunk_ids = cumsum_label_chunks(
+    cumsums, chunk_ids = _cumsum_assign_chunks(
         offsets_uniq["ioffset.cpos.diff"].to_numpy(), chunksize_bytes)
     offsets_uniq["chunk_id"] = chunk_ids
     offsets_uniq["size"] = cumsums
@@ -216,7 +177,7 @@ def chunk_offsets(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.DataFrame:
     return offsets_uniq
 
 
-def group_chunks(offsets_uniq: pd.DataFrame) -> pd.DataFrame:
+def consolidate_chunks(offsets_uniq: pd.DataFrame) -> pd.DataFrame:
     """Group the data by `chunk_id`,
        keeping the first compressed byte value (`ioffset.cpos`)
        and the first uncompressed byte value of that stream (`ioffset.upos`).
@@ -243,8 +204,8 @@ if __name__ == '__main__':
     # select the data that defines the byte range offsets in the file
     offsets = bai[0]["ioffsets"]
     # note that the chunksize in this example is 1MB, not 100MB as is recommended for dask
-    offsets_uniq = chunk_offsets(offsets, 1_000_000)
+    offsets_uniq = map_offsets_to_chunks(offsets, 1_000_000)
 
-    offset_groups = group_chunks(offsets_uniq)
+    offset_groups = consolidate_chunks(offsets_uniq)
 
     offset_groups
