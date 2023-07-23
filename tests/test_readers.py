@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from pandas.api.types import is_categorical_dtype, is_string_dtype
 
 import dask_ngs
 
@@ -22,19 +23,15 @@ def test_read_bam_pnext_value(example_bam):
 
 def test_read_correct_data_types_from_bam(example_bam):
     # Compares data types of read values against expected
-    assert example_bam.dtypes["qname"] == np.dtype("O")
+    assert is_string_dtype(example_bam.dtypes["qname"])
     assert example_bam.dtypes["flag"] == np.dtype("uint16")
-    assert isinstance(
-        example_bam.dtypes["rname"], pd.core.dtypes.dtypes.CategoricalDtype
-    )
+    assert is_categorical_dtype(example_bam.dtypes["rname"])
     assert example_bam.dtypes["pos"] == np.dtype("int32")
     assert example_bam.dtypes["mapq"] == np.dtype("uint8")
-    assert example_bam.dtypes["cigar"] == np.dtype("O")
-    assert isinstance(
-        example_bam.dtypes["rnext"], pd.core.dtypes.dtypes.CategoricalDtype
-    )
+    assert is_string_dtype(example_bam.dtypes["cigar"])
+    assert is_categorical_dtype(example_bam.dtypes["rnext"])
     assert example_bam.dtypes["pnext"] == np.dtype("int32")
     assert example_bam.dtypes["tlen"] == np.dtype("int32")
-    assert example_bam.dtypes["seq"] == np.dtype("O")
-    assert example_bam.dtypes["qual"] == np.dtype("O")
+    assert is_string_dtype(example_bam.dtypes["seq"])
+    assert is_string_dtype(example_bam.dtypes["qual"])
     assert example_bam.dtypes["end"] == np.dtype("int32")
