@@ -35,6 +35,7 @@ dynamic = ["version"]
 dependencies = [
   "dask",
   "oxbow>=0.2.0",
+  "pandas",
   "pyarrow",
   "typing_extensions >=3.7; python_version<'3.8'",
 ]
