@@ -120,21 +120,23 @@ def _cumsum_assign_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.arra
     """
     Loops through a given array of integers, cumulatively summing the values.
     The rows are labeled with a `chunk_id`, starting at 0.
+
     When the cumulative sum exceeds the threshold, the chunk_id is incremented,
     and the next rows are binned into the next chunk until again the threshold
     is reached. The cumulative sum of that chunk is also recorded as `size`.
     Returns a tuple of the cumulative sum array and the chunk_id array.
 
-    Args:
-        arr : numpy array
-            The array of byte offsets to chunk
-        thresh : int
-            The size of chunks in bytes
+    Parameters
+    ----------
+    arr : numpy array
+        The array of byte offsets to chunk
+    thresh : int
+        The size of chunks in bytes
 
-    Returns:
-        Tuple of numpy arrays
-        0 : array of cumulative byte sums
-        1 : array of chunk_ids assigned to each row
+    Returns
+    -------
+    array of cumulative byte sums
+    array of chunk_ids assigned to each row
     """
     sum = 0
     chunkid = 0
@@ -153,14 +155,16 @@ def _cumsum_assign_chunks(arr: np.array, thresh: int) -> tuple[np.array, np.arra
 def map_offsets_to_chunks(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.DataFrame:
     """Given a dataframe of offset positions, calculate the difference
     between each byte offset.
+
     Group those differences into chunks of size `chunksize_bytes`.
 
-    Returns:
-        A Pandas dataframe with additional columns:
-        chunk_id : int
-            The chunk index that row was assigned
-        size : int
-            The cumulative size of that chunk
+    Returns
+    -------
+    A Pandas dataframe with additional columns:
+    chunk_id : int
+        The chunk index that row was assigned
+    size : int
+        The cumulative size of that chunk
     """
 
     # calculate the difference in byte positions from the prior row
@@ -191,15 +195,20 @@ def map_offsets_to_chunks(offsets: pd.DataFrame, chunksize_bytes: int) -> pd.Dat
 
 
 def consolidate_chunks(offsets_uniq: pd.DataFrame) -> pd.DataFrame:
-    """Group the data by `chunk_id`,
-    keeping the first compressed byte value (`ioffset.cpos`)
-    and the first uncompressed byte value of that stream (`ioffset.upos`).
+    """Group the data by `chunk_id`, keeping the first compressed byte value
+    (`ioffset.cpos`) and the first uncompressed byte value of that stream
+    (`ioffset.upos`).
+
     Take the last `size` value which tells you how many compressed bytes to read.
 
-    Returns:
-        A Pandas dataframe grouped by `chunk_id`
-        Now you can decompress the data starting from `ioffset.cpos` and read `size` bytes.
-        `ioffsets.upos` tells you which byte to read first from the uncompressed data.
+    Returns
+    -------
+    A Pandas dataframe grouped by `chunk_id`
+
+    Notes
+    -----
+    Now you can decompress the data starting from `ioffset.cpos` and read `size` bytes.
+    `ioffsets.upos` tells you which byte to read first from the uncompressed data.
     """
     return offsets_uniq.groupby("chunk_id").agg(
         {"ioffset.cpos": "first", "ioffset.upos": "first", "size": "last"}
