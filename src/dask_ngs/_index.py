@@ -10,6 +10,7 @@ BAI_DEPTH = 5
 COMPRESSED_POSITION_SHIFT = 16
 UNCOMPRESSED_POSITION_MASK = 0xFFFF
 BLOCKSIZE = 65536
+BAM_PSEUDO_BIN = 37450
 
 
 def read_bai(path: str):
@@ -36,7 +37,7 @@ def read_bai(path: str):
                 # bin number
                 bin_id = int.from_bytes(f.read(4), **int_kwargs)
 
-                if bin_id == 37450:
+                if bin_id == BAM_PSEUDO_BIN:
                     # This is an entry that describes the "pseudo-bin" for the
                     # reference, using the same byte layout as normal bins but
                     # interpreted differently.
