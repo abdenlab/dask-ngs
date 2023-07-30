@@ -61,19 +61,21 @@ def read_bam(
     """
     path = Path(path)
     if index is None:
-        bai_index = path.with_suffix(".bai")
-        csi_index = path.with_suffix(".csi")
+        bai_index = path.with_suffix(path.suffix + ".bai")
+        csi_index = path.with_suffix(path.suffix + ".csi")
         if bai_index.exists():
-            index = bai_index
+            index = str(bai_index)
         elif csi_index.exists():
-            index = csi_index
+            index = str(csi_index)
         else:
             msg = "Index .bai or .csi file not found."
             raise FileNotFoundError(msg)
 
     vpos = ox.partition_from_index_file(index, chunksize)
     chunks = [
-        dask.delayed(_read_bam_vpos_from_path)(path, tuple(vpos[i]), tuple(vpos[i + 1]))
+        dask.delayed(_read_bam_vpos_from_path)(
+            str(path), tuple(vpos[i]), tuple(vpos[i + 1])
+        )
         for i in range(len(vpos) - 1)
     ]
 
@@ -103,19 +105,21 @@ def read_vcf(
     """
     path = Path(path)
     if index is None:
-        tbi_index = path.with_suffix(".tbi")
-        csi_index = path.with_suffix(".csi")
+        tbi_index = path.with_suffix(path.suffix + ".tbi")
+        csi_index = path.with_suffix(path.suffix + ".csi")
         if tbi_index.exists():
-            index = tbi_index
+            index = str(tbi_index)
         elif csi_index.exists():
-            index = csi_index
+            index = str(csi_index)
         else:
             msg = "Index .tbi or .csi file not found."
             raise FileNotFoundError(msg)
 
     vpos = ox.partition_from_index_file(index, chunksize)
     chunks = [
-        dask.delayed(_read_vcf_vpos_from_path)(path, tuple(vpos[i]), tuple(vpos[i + 1]))
+        dask.delayed(_read_vcf_vpos_from_path)(
+            str(path), tuple(vpos[i]), tuple(vpos[i + 1])
+        )
         for i in range(len(vpos) - 1)
     ]
 
@@ -145,16 +149,18 @@ def read_bcf(
     """
     path = Path(path)
     if index is None:
-        csi_index = path.with_suffix(".csi")
+        csi_index = path.with_suffix(path.suffix + ".csi")
         if csi_index.exists():
-            index = csi_index
+            index = str(csi_index)
         else:
             msg = "Index .csi file not found."
             raise FileNotFoundError(msg)
 
     vpos = ox.partition_from_index_file(index, chunksize)
     chunks = [
-        dask.delayed(_read_bcf_vpos_from_path)(path, tuple(vpos[i]), tuple(vpos[i + 1]))
+        dask.delayed(_read_bcf_vpos_from_path)(
+            str(path), tuple(vpos[i]), tuple(vpos[i + 1])
+        )
         for i in range(len(vpos) - 1)
     ]
 
